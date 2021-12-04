@@ -7,9 +7,9 @@ import (
 )
 
 func TestGreeterAsksNameAndGreetsBack(t *testing.T) {
-	fakeOut := &bytes.Buffer{}
 	fakeIn := bytes.NewBufferString("artm\n")
-	greeter.Greet(fakeOut, fakeIn)
+	fakeOut := &bytes.Buffer{}
+	greeter.Greet(fakeIn, fakeOut)
 	got := fakeOut.String()
 	want := "What's your name? Hello, artm!\n"
 	if got != want {

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func Greet(out io.Writer, in io.Reader) {
+func Greet(in io.Reader, out io.Writer) {
 	bufout := bufio.NewWriter(out)
 	bufout.WriteString("What's your name? ")
 	bufout.Flush()

@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	greeter.Greet(os.Stdout, os.Stdin)
+	greeter.Greet(os.Stdin, os.Stdout)
 }
