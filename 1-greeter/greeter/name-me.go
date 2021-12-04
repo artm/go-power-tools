@@ -7,7 +7,12 @@ import (
 	"strings"
 )
 
-func AskName(out io.Writer, in io.Reader) string {
+func Greet(out io.Writer, in io.Reader) {
+	name := askName(out, in)
+	greet(out, name)
+}
+
+func askName(out io.Writer, in io.Reader) string {
 	bufout := bufio.NewWriter(out)
 	bufout.WriteString("What's your name? ")
 	bufout.Flush()
@@ -18,7 +23,7 @@ func AskName(out io.Writer, in io.Reader) string {
 	return name
 }
 
-func Greet(out io.Writer, name string) {
+func greet(out io.Writer, name string) {
 	bufout := bufio.NewWriter(out)
 	bufout.WriteString(fmt.Sprintf("Hello, %s!\n", name))
 	bufout.Flush()
