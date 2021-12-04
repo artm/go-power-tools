@@ -2,7 +2,7 @@ package greeter_test
 
 import (
 	"bytes"
-	"greeter/greeter"
+	"greeter"
 	"testing"
 )
 

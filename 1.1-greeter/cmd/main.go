@@ -1,7 +1,7 @@
 package main
 
 import (
-	"greeter/greeter"
+	"greeter"
 	"os"
 )
 
