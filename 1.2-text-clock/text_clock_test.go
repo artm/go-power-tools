@@ -3,7 +3,7 @@ package text_clock_test
 import (
 	"bytes"
 	"testing"
-	"text-clock/text_clock"
+	text_clock "text-clock"
 	"time"
 )
 

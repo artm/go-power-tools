@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"text-clock/text_clock"
+	text_clock "text-clock"
 	"time"
 )
 
