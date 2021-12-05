@@ -3,14 +3,19 @@ package greeter_test
 import (
 	"bytes"
 	"greeter"
+	"io"
 	"testing"
 )
 
 func TestGreeterAsksNameAndGreetsBack(t *testing.T) {
-	fakeIn := bytes.NewBufferString("artm\n")
-	fakeOut := &bytes.Buffer{}
-	greeter.Greet(fakeIn, fakeOut)
-	got := fakeOut.String()
+	mockReader := bytes.NewBufferString("artm\n")
+	mockWriter := &bytes.Buffer{}
+	mockGreeter := greeter.Greeter{
+		In:  io.Reader(mockReader),
+		Out: io.Writer(mockWriter),
+	}
+	mockGreeter.Greet()
+	got := mockWriter.String()
 	want := "What's your name? Hello, artm!\n"
 	if got != want {
 		t.Errorf("want: '%s', got: '%s'", want, got)

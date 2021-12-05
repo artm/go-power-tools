@@ -4,18 +4,35 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
-func Greet(in io.Reader, out io.Writer) {
-	bufout := bufio.NewWriter(out)
+type Greeter struct {
+	In  io.Reader
+	Out io.Writer
+}
+
+func NewGreeter() Greeter {
+	return Greeter{
+		In:  os.Stdin,
+		Out: os.Stdout,
+	}
+}
+
+func (greeter Greeter) Greet() {
+	bufout := bufio.NewWriter(greeter.Out)
 	bufout.WriteString("What's your name? ")
 	bufout.Flush()
 
-	bufin := bufio.NewReader(in)
+	bufin := bufio.NewReader(greeter.In)
 	name, _ := bufin.ReadString('\n')
 	name = strings.TrimRight(name, "\r\n")
 
 	bufout.WriteString(fmt.Sprintf("Hello, %s!\n", name))
 	bufout.Flush()
+}
+
+func Greet() {
+	NewGreeter().Greet()
 }
