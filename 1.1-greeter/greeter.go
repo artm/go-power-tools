@@ -21,16 +21,13 @@ func NewGreeter() Greeter {
 }
 
 func (greeter Greeter) Greet() {
-	bufout := bufio.NewWriter(greeter.Out)
-	bufout.WriteString("What's your name? ")
-	bufout.Flush()
+	fmt.Fprint(greeter.Out, "What's your name? ")
 
 	bufin := bufio.NewReader(greeter.In)
 	name, _ := bufin.ReadString('\n')
 	name = strings.TrimRight(name, "\r\n")
 
-	bufout.WriteString(fmt.Sprintf("Hello, %s!\n", name))
-	bufout.Flush()
+	fmt.Fprintf(greeter.Out, "Hello, %s!\n", name)
 }
 
 func Greet() {
