@@ -9,15 +9,15 @@ import (
 )
 
 func TestPrinter(t *testing.T) {
-	fakeOut := &bytes.Buffer{}
+	mockWriter := &bytes.Buffer{}
 	when, _ := time.Parse("15:04", "23:08")
 
 	printer := text_clock.Printer{
-		Writer: io.Writer(fakeOut),
+		Writer: io.Writer(mockWriter),
 	}
 
 	printer.Print(when)
-	got := fakeOut.String()
+	got := mockWriter.String()
 	want := "It's 8 minutes past 23\n"
 	if got != want {
 		t.Errorf(`want: "%s", got: "%s"`, want, got)
