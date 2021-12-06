@@ -21,13 +21,28 @@ kung-foo
 `
 )
 
-func TestGrep(t *testing.T) {
+func TestGrepWithOptions(t *testing.T) {
+	t.Parallel()
 	mockReader := bytes.NewBufferString(testInput)
 	mockWriter := &bytes.Buffer{}
 	searcher := grep.NewSearcher(
 		grep.WithWriter(io.Writer(mockWriter)),
 		grep.WithReader(io.Reader(mockReader)),
 	)
+	searcher.Search("foo")
+	got := mockWriter.String()
+	if got != want {
+		t.Errorf("want: %#v, got: %#v", want, got)
+	}
+}
+
+func TestGrepWithSetterChains(t *testing.T) {
+	t.Parallel()
+	mockReader := bytes.NewBufferString(testInput)
+	mockWriter := &bytes.Buffer{}
+	searcher := grep.NewSearcher().
+		WithWriter(io.Writer(mockWriter)).
+		WithReader(io.Reader(mockReader))
 	searcher.Search("foo")
 	got := mockWriter.String()
 	if got != want {

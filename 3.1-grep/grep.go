@@ -15,13 +15,13 @@ type Searcher struct {
 
 type option func(*Searcher)
 
-func NewSearcher(options ...option) Searcher {
-	searcher := Searcher{
+func NewSearcher(options ...option) *Searcher {
+	searcher := &Searcher{
 		reader: os.Stdin,
 		writer: os.Stdout,
 	}
 	for _, optfunc := range options {
-		optfunc(&searcher)
+		optfunc(searcher)
 	}
 	return searcher
 }
@@ -36,6 +36,16 @@ func WithReader(reader io.Reader) option {
 	return func(searcher *Searcher) {
 		searcher.reader = reader
 	}
+}
+
+func (searcher *Searcher) WithWriter(writer io.Writer) *Searcher {
+	searcher.writer = writer
+	return searcher
+}
+
+func (searcher *Searcher) WithReader(reader io.Reader) *Searcher {
+	searcher.reader = reader
+	return searcher
 }
 
 func (searcher *Searcher) Search(what string) {
