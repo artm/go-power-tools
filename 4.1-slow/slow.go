@@ -9,7 +9,7 @@ import (
 )
 
 type Printer struct {
-	reader io.Reader
+	reader io.ReadCloser
 	writer io.Writer
 	delay  time.Duration
 }
@@ -32,8 +32,12 @@ func NewPrinter(options ...option) (*Printer, error) {
 }
 
 func WithReader(reader io.Reader) option {
+	readCloser, ok := reader.(io.ReadCloser)
+	if !ok {
+		readCloser = io.NopCloser(reader)
+	}
 	return func(p *Printer) error {
-		p.reader = reader
+		p.reader = readCloser
 		return nil
 	}
 }
@@ -64,6 +68,7 @@ func WithArgs(args []string) option {
 }
 
 func (p *Printer) Print() error {
+	defer p.reader.Close()
 	reader := bufio.NewReader(p.reader)
 	for {
 		rune, size, err := reader.ReadRune()
