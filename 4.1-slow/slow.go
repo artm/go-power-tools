@@ -84,3 +84,14 @@ func (p *Printer) Print() error {
 		time.Sleep(p.delay)
 	}
 }
+
+func Print(options ...option) {
+	printer, err := NewPrinter(options...)
+	if err != nil {
+		panic(err)
+	}
+	err = printer.Print()
+	if err != nil {
+		panic(err)
+	}
+}
