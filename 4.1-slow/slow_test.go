@@ -16,13 +16,17 @@ func TestSlowPrintReaderIn(t *testing.T) {
 	testDelay := 10 * time.Millisecond
 	mockReader := strings.NewReader(testText)
 	mockWriter := &bytes.Buffer{}
-	printer := slow.NewPrinter(
+	printer, err := slow.NewPrinter(
+		slow.WithArgs([]string{}),
 		slow.WithReader(io.Reader(mockReader)),
 		slow.WithWriter(io.Writer(mockWriter)),
 		slow.WithDelay(testDelay),
 	)
+	if err != nil {
+		t.Error(err)
+	}
 	start := time.Now()
-	err := printer.Print()
+	err = printer.Print()
 	if err != nil {
 		t.Error(err)
 	}
@@ -49,11 +53,14 @@ func TestSlowPrintFileIn(t *testing.T) {
 	args := []string{
 		testFilePath,
 	}
-	printer := slow.NewPrinter(
+	printer, err := slow.NewPrinter(
 		slow.WithArgs(args),
 		slow.WithWriter(io.Writer(mockWriter)),
 		slow.WithDelay(testDelay),
 	)
+	if err != nil {
+		t.Error(err)
+	}
 	start := time.Now()
 	err = printer.Print()
 	if err != nil {

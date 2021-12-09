@@ -14,45 +14,52 @@ type Printer struct {
 	delay  time.Duration
 }
 
-type option func(*Printer)
+type option func(*Printer) error
 
-func NewPrinter(options ...option) *Printer {
+func NewPrinter(options ...option) (*Printer, error) {
 	p := &Printer{
 		reader: os.Stdin,
 		writer: os.Stdout,
 		delay:  1 * time.Second,
 	}
 	for _, o := range options {
-		o(p)
+		err := o(p)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return p
+	return p, nil
 }
 
 func WithReader(reader io.Reader) option {
-	return func(p *Printer) {
+	return func(p *Printer) error {
 		p.reader = reader
+		return nil
 	}
 }
 
 func WithWriter(writer io.Writer) option {
-	return func(p *Printer) {
+	return func(p *Printer) error {
 		p.writer = writer
+		return nil
 	}
 }
 
 func WithDelay(delay time.Duration) option {
-	return func(p *Printer) {
+	return func(p *Printer) error {
 		p.delay = delay
+		return nil
 	}
 }
 
 func WithArgs(args []string) option {
-	return func(p *Printer) {
+	return func(p *Printer) error {
+		if len(args) < 1 {
+			return nil
+		}
 		var err error
 		p.reader, err = os.Open(args[0])
-		if err != nil {
-			panic(err)
-		}
+		return err
 	}
 }
 
