@@ -46,6 +46,16 @@ func WithDelay(delay time.Duration) option {
 	}
 }
 
+func WithArgs(args []string) option {
+	return func(p *Printer) {
+		var err error
+		p.reader, err = os.Open(args[0])
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func (p *Printer) Print() error {
 	reader := bufio.NewReader(p.reader)
 	for {
