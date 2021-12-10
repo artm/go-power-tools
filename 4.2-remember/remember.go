@@ -102,6 +102,6 @@ func (mem *Memory) writeReminders(reminders []string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(mem.memPath, jsonString, os.ModePerm)
+	err = ioutil.WriteFile(mem.memPath, jsonString, 0644)
 	return err
 }
