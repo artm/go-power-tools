@@ -28,7 +28,7 @@ func TestRemember(t *testing.T) {
 		},
 		{
 			args: []string{"buy", "milk"},
-			want: "",
+			want: "sure\n",
 		},
 		{
 			args: []string{},
@@ -36,7 +36,7 @@ func TestRemember(t *testing.T) {
 		},
 		{
 			args: []string{"call mom"},
-			want: "",
+			want: "sure\n",
 		},
 		{
 			args: []string{},

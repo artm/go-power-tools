@@ -74,6 +74,10 @@ func (mem *Memory) Run() error {
 		rem := strings.Join(mem.args, " ")
 		reminders = append(reminders, rem)
 		err = mem.writeReminders(reminders)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(mem.writer, "sure")
 		return err
 	}
 }
