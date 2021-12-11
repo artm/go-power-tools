@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"wc"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 var testCases = []struct {
@@ -36,6 +38,26 @@ var testCases = []struct {
 	{"-w -c -l testdata/three_lines.txt", ""},
 	{"-w -c -l -m testdata/three_lines.txt", ""},
 	{"-w -c -l -m -L testdata/three_lines.txt", ""},
+	{"testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-c testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-m testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-l testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-L testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-w testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-w -c testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-w -c -l testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-w -c -l -m testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"-w -c -l -m -L testdata/three_lines.txt testdata/lorem.txt", ""},
+	{"testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-c testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-m testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-l testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-L testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-w testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-w -c testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-w -c -l testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-w -c -l -m testdata/three_lines.txt -", "abra\ncadabra"},
+	{"-w -c -l -m -L testdata/three_lines.txt -", "abra\ncadabra"},
 }
 
 func TestWc(t *testing.T) {
@@ -65,10 +87,10 @@ func TestWc(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if got != want {
+		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf(
-				"args: %#v wanted: %#v got: %#v",
-				args, want, got,
+				"wc %s -want +got:\n%s",
+				testCase.args, diff,
 			)
 		}
 	}
