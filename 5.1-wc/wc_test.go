@@ -62,34 +62,39 @@ var testCases = []struct {
 
 func TestWc(t *testing.T) {
 	for _, testCase := range testCases {
-		fakeInput := strings.NewReader(testCase.stdin)
-		fakeOutput := bytes.NewBuffer([]byte{})
-		var args []string
-		if testCase.args == "" {
-			args = make([]string, 0)
-		} else {
-			args = strings.Split(testCase.args, " ")
-		}
-		want := runWc(t, testCase.stdin, args...)
-		wc, err := wc.NewWc(
-			wc.WithInput(io.Reader(fakeInput)),
-			wc.WithArgs(args),
-			wc.WithOutput(io.Writer(fakeOutput)),
-		)
-		if err != nil {
-			t.Error(err)
-		}
-		err = wc.Count()
-		if err != nil {
-			t.Error(err)
-		}
-		got := fakeOutput.String()
-		if err != nil {
-			t.Error(err)
-		}
-		if got != want {
-			t.Errorf(textDiff(testCase.args, want, got))
-		}
+		// https://gist.github.com/posener/92a55c4cd441fc5e5e85f27bca008721
+		testCase := testCase
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+			fakeInput := strings.NewReader(testCase.stdin)
+			fakeOutput := bytes.NewBuffer([]byte{})
+			var args []string
+			if testCase.args == "" {
+				args = make([]string, 0)
+			} else {
+				args = strings.Split(testCase.args, " ")
+			}
+			want := runWc(t, testCase.stdin, args...)
+			wc, err := wc.NewWc(
+				wc.WithInput(io.Reader(fakeInput)),
+				wc.WithArgs(args),
+				wc.WithOutput(io.Writer(fakeOutput)),
+			)
+			if err != nil {
+				t.Error(err)
+			}
+			err = wc.Count()
+			if err != nil {
+				t.Error(err)
+			}
+			got := fakeOutput.String()
+			if err != nil {
+				t.Error(err)
+			}
+			if got != want {
+				t.Errorf(textDiff(testCase.args, want, got))
+			}
+		})
 	}
 }
 
