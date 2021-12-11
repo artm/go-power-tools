@@ -33,6 +33,9 @@ type charCount struct{}
 type byteCount struct{}
 type widthStat struct{}
 
+var defaultStats = []stat{lineCount{}, wordCount{}, byteCount{}}
+var wordRe = regexp.MustCompile(`\pL+`)
+
 type resultRow struct {
 	numbers []int
 	path    string
@@ -64,8 +67,7 @@ func WithArgs(args []string) option {
 			{fset.Bool("c", false, "print the byte counts"), byteCount{}},
 			{fset.Bool("L", false, "print the maximum display width"), widthStat{}},
 		}
-		err := fset.Parse(args)
-		if err != nil {
+		if err := fset.Parse(args); err != nil {
 			return err
 		}
 		for _, rec := range statsOrder {
@@ -74,7 +76,7 @@ func WithArgs(args []string) option {
 			}
 		}
 		if len(wc.stats) == 0 {
-			wc.stats = []stat{lineCount{}, wordCount{}, byteCount{}}
+			wc.stats = defaultStats
 		}
 		wc.paths = fset.Args()
 		if len(wc.paths) == 0 {
@@ -103,24 +105,21 @@ func WithInput(input io.Reader) option {
 func (wc *Wc) Count() error {
 	results := make([]resultRow, 0)
 	for _, path := range wc.paths {
-		var f io.ReadCloser
+		var file io.ReadCloser
 		var err error
 		if path == "-" {
-			var ok bool
-			f, ok = wc.input.(io.ReadCloser)
-			if !ok {
-				f = io.NopCloser(wc.input)
-			}
+			file = wc.inputCloser()
 		} else {
-			f, err = os.Open(path)
+			file, err = os.Open(path)
 			if err != nil {
 				return err
 			}
 		}
+		defer file.Close()
 		result := resultRow{
 			path: path,
 		}
-		result.numbers, err = wc.countIn(f)
+		result.numbers, err = wc.countIn(file)
 		if err != nil {
 			return err
 		}
@@ -132,6 +131,14 @@ func (wc *Wc) Count() error {
 	}
 	wc.Print(results)
 	return nil
+}
+
+func (wc *Wc) inputCloser() io.ReadCloser {
+	file, ok := wc.input.(io.ReadCloser)
+	if !ok {
+		file = io.NopCloser(wc.input)
+	}
+	return file
 }
 
 func Count() error {
@@ -221,8 +228,6 @@ func (lineCount) update(count *int, line string) {
 func (lineCount) aggregate(agg *int, count int) {
 	*agg += count
 }
-
-var wordRe = regexp.MustCompile(`\pL+`)
 
 func (wordCount) update(count *int, line string) {
 	*count += len(wordRe.FindAllString(line, -1))
