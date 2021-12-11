@@ -12,6 +12,7 @@ import (
 
 type Wc struct {
 	output                            io.Writer
+	input                             io.Reader
 	bytes, chars, lines, width, words bool
 	paths                             []string
 }
@@ -53,6 +54,9 @@ func WithArgs(args []string) option {
 			wc.bytes = true
 		}
 		wc.paths = fset.Args()
+		if len(wc.paths) == 0 {
+			wc.paths = []string{"-"}
+		}
 		return nil
 	}
 }
@@ -64,13 +68,33 @@ func WithOutput(output io.Writer) option {
 	}
 }
 
+func WithInput(input io.Reader) option {
+	return func(wc *Wc) error {
+		wc.input = input
+		return nil
+	}
+}
+
 func (wc *Wc) Count() error {
 	for _, path := range wc.paths {
-		f, err := os.Open(path)
+		var f io.ReadCloser
+		var err error
+		if path == "-" {
+			var ok bool
+			f, ok = wc.input.(io.ReadCloser)
+			if !ok {
+				f = io.NopCloser(wc.input)
+			}
+		} else {
+			f, err = os.Open(path)
+			if err != nil {
+				return err
+			}
+		}
+		err = wc.countIn(f, path)
 		if err != nil {
 			return err
 		}
-		wc.countIn(f, path)
 	}
 	return nil
 }
@@ -87,22 +111,29 @@ func Count() error {
 	return nil
 }
 
-func (wc *Wc) countIn(reader io.Reader, path string) {
+func (wc *Wc) countIn(reader io.Reader, path string) error {
 	var lines, bytes, chars, width, words int
 	streader := bufio.NewReader(reader)
 	for {
 		line, err := streader.ReadString('\n')
+		if line != "" {
+			bytes += len(line)
+			lineChars := len([]rune(line))
+			chars += lineChars
+			if lineChars > width {
+				width = lineChars
+				if strings.HasSuffix(line, "\n") {
+					width--
+					lines++
+				}
+			}
+			words += len(strings.Split(line, " "))
+		}
 		if err == io.EOF {
 			break
+		} else if err != nil {
+			return err
 		}
-		lines++
-		bytes += len(line)
-		lineChars := len([]rune(line))
-		chars += lineChars
-		if lineChars > width {
-			width = lineChars - 1
-		}
-		words += len(strings.Split(line, " "))
 	}
 	tokens := []string{}
 	if wc.flagCount() == 1 {
@@ -121,6 +152,10 @@ func (wc *Wc) countIn(reader io.Reader, path string) {
 		}
 		tokens = append(tokens, strconv.Itoa(count))
 	} else {
+		countFmt := "%2d"
+		if path == "-" {
+			countFmt = "%7d"
+		}
 		order := []struct {
 			on    bool
 			count int
@@ -133,12 +168,15 @@ func (wc *Wc) countIn(reader io.Reader, path string) {
 		}
 		for _, rec := range order {
 			if rec.on {
-				tokens = append(tokens, fmt.Sprintf("%2d", rec.count))
+				tokens = append(tokens, fmt.Sprintf(countFmt, rec.count))
 			}
 		}
 	}
-	tokens = append(tokens, path)
+	if path != "-" {
+		tokens = append(tokens, path)
+	}
 	fmt.Fprintf(wc.output, "%s\n", strings.Join(tokens, " "))
+	return nil
 }
 
 func (wc *Wc) flagCount() int {

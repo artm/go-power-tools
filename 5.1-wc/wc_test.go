@@ -2,6 +2,7 @@ package wc_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os/exec"
 	"strings"
@@ -9,27 +10,43 @@ import (
 	"wc"
 )
 
-var testCases = []string{
-	"testdata/three_lines.txt",
-	"-c testdata/three_lines.txt",
-	"-m testdata/three_lines.txt",
-	"-l testdata/three_lines.txt",
-	"-L testdata/three_lines.txt",
-	"-w testdata/three_lines.txt",
-	"-w -c testdata/three_lines.txt",
-	"-w -c -l testdata/three_lines.txt",
-	"-w -c -l -m testdata/three_lines.txt",
-	"-w -c -l -m -L testdata/three_lines.txt",
+var testCases = []struct {
+	args  string
+	stdin string
+}{
+	{"", "abra\ncadabra"},
+	{"-c", "abra\ncadabra"},
+	{"-m", "abra\ncadabra"},
+	{"-l", "abra\ncadabra"},
+	{"-L", "abra\ncadabra"},
+	{"-w", "abra\ncadabra"},
+	{"testdata/three_lines.txt", ""},
+	{"-c testdata/three_lines.txt", ""},
+	{"-m testdata/three_lines.txt", ""},
+	{"-l testdata/three_lines.txt", ""},
+	{"-L testdata/three_lines.txt", ""},
+	{"-w testdata/three_lines.txt", ""},
+	{"-w -c testdata/three_lines.txt", ""},
+	{"-w -c -l testdata/three_lines.txt", ""},
+	{"-w -c -l -m testdata/three_lines.txt", ""},
+	{"-w -c -l -m -L testdata/three_lines.txt", ""},
 }
 
 func TestWc(t *testing.T) {
 	for _, testCase := range testCases {
-		fakeWriter := bytes.NewBuffer([]byte{})
-		args := strings.Split(testCase, " ")
-		want := runWc(t, args...)
+		fakeInput := strings.NewReader(testCase.stdin)
+		fakeOutput := bytes.NewBuffer([]byte{})
+		var args []string
+		if testCase.args == "" {
+			args = make([]string, 0)
+		} else {
+			args = strings.Split(testCase.args, " ")
+		}
+		want := runWc(t, testCase.stdin, args...)
 		wc, err := wc.NewWc(
+			wc.WithInput(io.Reader(fakeInput)),
 			wc.WithArgs(args),
-			wc.WithOutput(io.Writer(fakeWriter)),
+			wc.WithOutput(io.Writer(fakeOutput)),
 		)
 		if err != nil {
 			t.Error(err)
@@ -38,7 +55,7 @@ func TestWc(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		got := fakeWriter.String()
+		got := fakeOutput.String()
 		if err != nil {
 			t.Error(err)
 		}
@@ -51,10 +68,22 @@ func TestWc(t *testing.T) {
 	}
 }
 
-func runWc(t *testing.T, args ...string) string {
-	output, err := exec.Command("wc", args...).Output()
+func runWc(t *testing.T, input string, args ...string) string {
+	cmd := exec.Command("wc", args...)
+	if input != "" {
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			t.Error(err)
+		}
+		fmt.Fprint(stdin, input)
+		err = stdin.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	output, err := cmd.Output()
 	if err != nil {
-		t.Error(err)
+		t.Errorf("wc args: %#v: %s", args, err)
 	}
 	return string(output)
 }
