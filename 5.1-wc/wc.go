@@ -9,13 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
-
-type stat interface {
-	update(*int, string)
-	aggregate(*int, int)
-}
 
 type Wc struct {
 	output    io.Writer
@@ -27,11 +21,7 @@ type Wc struct {
 
 type option func(*Wc) error
 
-type lineCount struct{}
-type wordCount struct{}
-type charCount struct{}
-type byteCount struct{}
-type widthStat struct{}
+const stdin = "-"
 
 var defaultStats = []stat{lineCount{}, wordCount{}, byteCount{}}
 var wordRe = regexp.MustCompile(`\pL+`)
@@ -80,7 +70,7 @@ func WithArgs(args []string) option {
 		}
 		wc.paths = fset.Args()
 		if len(wc.paths) == 0 {
-			wc.paths = []string{"-"}
+			wc.paths = []string{stdin}
 		} else {
 			wc.printPath = true
 		}
@@ -107,7 +97,7 @@ func (wc *Wc) Count() error {
 	for _, path := range wc.paths {
 		var file io.ReadCloser
 		var err error
-		if path == "-" {
+		if path == stdin {
 			file = wc.inputCloser()
 		} else {
 			file, err = os.Open(path)
@@ -126,10 +116,9 @@ func (wc *Wc) Count() error {
 		results = append(results, result)
 	}
 	if len(results) > 1 {
-		total := wc.CalcTotal(results)
-		results = append(results, total)
+		results = append(results, wc.total(results))
 	}
-	wc.Print(results)
+	wc.print(results)
 	return nil
 }
 
@@ -172,7 +161,7 @@ func (wc *Wc) countIn(reader io.Reader) ([]int, error) {
 	return counts, nil
 }
 
-func (wc *Wc) CalcTotal(results []resultRow) resultRow {
+func (wc *Wc) total(results []resultRow) resultRow {
 	total := resultRow{
 		path:    "total",
 		numbers: make([]int, len(wc.stats)),
@@ -185,7 +174,7 @@ func (wc *Wc) CalcTotal(results []resultRow) resultRow {
 	return total
 }
 
-func (wc *Wc) Print(results []resultRow) {
+func (wc *Wc) print(results []resultRow) {
 	statsCount := len(wc.stats)
 	wideStdin := len(results) > 1 || statsCount > 1
 	colWidth := 1
@@ -198,14 +187,11 @@ func (wc *Wc) Print(results []resultRow) {
 			if colWidth < width {
 				colWidth = width
 			}
-			if wideStdin &&
-				(result.path == "-") &&
-				colWidth < 7 {
+			if wideStdin && result.path == stdin && colWidth < 7 {
 				colWidth = 7
 			}
 		}
 	}
-
 	colFmt := fmt.Sprintf("%%%dd", colWidth)
 	for _, result := range results {
 		var row []string
@@ -216,51 +202,5 @@ func (wc *Wc) Print(results []resultRow) {
 			row = append(row, result.path)
 		}
 		fmt.Fprintln(wc.output, strings.Join(row, " "))
-	}
-}
-
-func (lineCount) update(count *int, line string) {
-	if strings.HasSuffix(line, "\n") {
-		*count++
-	}
-}
-
-func (lineCount) aggregate(agg *int, count int) {
-	*agg += count
-}
-
-func (wordCount) update(count *int, line string) {
-	*count += len(wordRe.FindAllString(line, -1))
-}
-
-func (wordCount) aggregate(agg *int, count int) {
-	*agg += count
-}
-
-func (charCount) update(count *int, line string) {
-	*count += utf8.RuneCountInString(line)
-}
-
-func (charCount) aggregate(agg *int, count int) {
-	*agg += count
-}
-
-func (byteCount) update(count *int, line string) {
-	*count += len(line)
-}
-
-func (byteCount) aggregate(agg *int, count int) {
-	*agg += count
-}
-
-func (ws widthStat) update(width *int, line string) {
-	line = strings.TrimRight(line, "\n")
-	runeCount := utf8.RuneCountInString(line)
-	ws.aggregate(width, runeCount)
-}
-
-func (widthStat) aggregate(agg *int, width int) {
-	if *agg < width {
-		*agg = width
 	}
 }
