@@ -181,14 +181,18 @@ func (wc *Wc) CalcTotals(results [][]string) [][]string {
 }
 
 func (wc *Wc) Print(results [][]string) {
+	wideStdin := len(results) > 1 || len(results[0]) > 2
 	colWidth := 1
+	if len(results) > 1 && len(results[0]) == 2 {
+		colWidth = 4
+	}
 	for _, result := range results {
 		for _, count := range result[:len(result)-1] {
 			if colWidth < len(count) {
 				colWidth = len(count)
 			}
 			path := result[len(result)-1]
-			if len(result) > 2 &&
+			if wideStdin &&
 				(path == "-" || path == "") &&
 				colWidth < 7 {
 				colWidth = 7
