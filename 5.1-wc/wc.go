@@ -6,18 +6,36 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
+type stat interface {
+	update(*int, string)
+	aggregate(*int, int)
+}
+
 type Wc struct {
-	output                            io.Writer
-	input                             io.Reader
-	bytes, chars, lines, width, words bool
-	paths                             []string
+	output io.Writer
+	input  io.Reader
+	stats  []stat
+	paths  []string
 }
 
 type option func(*Wc) error
+
+type lineCount struct{}
+type wordCount struct{}
+type charCount struct{}
+type byteCount struct{}
+type widthStat struct{}
+
+type resultRow struct {
+	numbers []int
+	path    string
+}
 
 func NewWc(options ...option) (*Wc, error) {
 	wc := &Wc{
@@ -34,24 +52,34 @@ func NewWc(options ...option) (*Wc, error) {
 func WithArgs(args []string) option {
 	return func(wc *Wc) error {
 		fset := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-		bytes := fset.Bool("c", false, "print the byte counts")
-		chars := fset.Bool("m", false, "print the character counts")
 		lines := fset.Bool("l", false, "print the newline counts")
-		width := fset.Bool("L", false, "print the maximum display width")
 		words := fset.Bool("w", false, "print the word counts")
+		chars := fset.Bool("m", false, "print the character counts")
+		bytes := fset.Bool("c", false, "print the byte counts")
+		width := fset.Bool("L", false, "print the maximum display width")
 		err := fset.Parse(args)
 		if err != nil {
 			return err
 		}
-		wc.bytes = *bytes
-		wc.chars = *chars
-		wc.lines = *lines
-		wc.width = *width
-		wc.words = *words
 		if !(*bytes || *chars || *lines || *width || *words) {
-			wc.lines = true
-			wc.words = true
-			wc.bytes = true
+			*lines = true
+			*words = true
+			*bytes = true
+		}
+		if *lines {
+			wc.stats = append(wc.stats, lineCount{})
+		}
+		if *words {
+			wc.stats = append(wc.stats, wordCount{})
+		}
+		if *chars {
+			wc.stats = append(wc.stats, charCount{})
+		}
+		if *bytes {
+			wc.stats = append(wc.stats, byteCount{})
+		}
+		if *width {
+			wc.stats = append(wc.stats, widthStat{})
 		}
 		wc.paths = fset.Args()
 		if len(wc.paths) == 0 {
@@ -76,7 +104,7 @@ func WithInput(input io.Reader) option {
 }
 
 func (wc *Wc) Count() error {
-	results := make([][]string, 0)
+	results := make([]resultRow, 0)
 	for _, path := range wc.paths {
 		var f io.ReadCloser
 		var err error
@@ -92,14 +120,19 @@ func (wc *Wc) Count() error {
 				return err
 			}
 		}
-		result, err := wc.countIn(f)
+		result := resultRow{
+			path: path,
+		}
+		result.numbers, err = wc.countIn(f)
 		if err != nil {
 			return err
 		}
-		result = append(result, path)
 		results = append(results, result)
 	}
-	results = wc.CalcTotals(results)
+	if len(results) > 1 {
+		total := wc.CalcTotal(results)
+		results = append(results, total)
+	}
 	wc.Print(results)
 	return nil
 }
@@ -116,23 +149,15 @@ func Count() error {
 	return nil
 }
 
-func (wc *Wc) countIn(reader io.Reader) ([]string, error) {
-	var lines, bytes, chars, width, words int
+func (wc *Wc) countIn(reader io.Reader) ([]int, error) {
+	counts := make([]int, len(wc.stats))
 	streader := bufio.NewReader(reader)
 	for {
 		line, err := streader.ReadString('\n')
-		if line != "" {
-			bytes += len(line)
-			lineChars := len([]rune(line))
-			chars += lineChars
-			if lineChars > width {
-				width = lineChars
-				if strings.HasSuffix(line, "\n") {
-					width--
-					lines++
-				}
+		if len(line) > 0 {
+			for i, stat := range wc.stats {
+				stat.update(&counts[i], line)
 			}
-			words += len(strings.Split(line, " "))
 		}
 		if err == io.EOF {
 			break
@@ -140,75 +165,100 @@ func (wc *Wc) countIn(reader io.Reader) ([]string, error) {
 			return nil, err
 		}
 	}
-	results := make([]string, 0)
-	order := []struct {
-		on    bool
-		count int
-	}{
-		{on: wc.lines, count: lines},
-		{on: wc.words, count: words},
-		{on: wc.chars, count: chars},
-		{on: wc.bytes, count: bytes},
-		{on: wc.width, count: width},
-	}
-	for _, rec := range order {
-		if rec.on {
-			results = append(results, strconv.Itoa(rec.count))
-		}
-	}
-	return results, nil
+	return counts, nil
 }
 
-func (wc *Wc) CalcTotals(results [][]string) [][]string {
-	if len(results) < 2 {
-		return results
+func (wc *Wc) CalcTotal(results []resultRow) resultRow {
+	total := resultRow{
+		path:    "total",
+		numbers: make([]int, len(wc.stats)),
 	}
-	colNum := len(results[0])
-	totals := make([]int, colNum-1)
 	for _, result := range results {
-		for i, count := range result[:colNum-1] {
-			iCount, _ := strconv.Atoi(count)
-			totals[i] += iCount
+		for i, stat := range wc.stats {
+			stat.aggregate(&total.numbers[i], result.numbers[i])
 		}
 	}
-	sTotals := make([]string, colNum)
-	for i, v := range totals {
-		sTotals[i] = strconv.Itoa(v)
-	}
-	sTotals[colNum-1] = "total"
-	results = append(results, sTotals)
-	return results
+	return total
 }
 
-func (wc *Wc) Print(results [][]string) {
-	wideStdin := len(results) > 1 || len(results[0]) > 2
+func (wc *Wc) Print(results []resultRow) {
+	statsCount := len(wc.stats)
+	wideStdin := len(results) > 1 || statsCount > 1
 	colWidth := 1
-	if len(results) > 1 && len(results[0]) == 2 {
+	if len(results) > 1 && statsCount == 1 {
 		colWidth = 4
 	}
 	for _, result := range results {
-		for _, count := range result[:len(result)-1] {
-			if colWidth < len(count) {
-				colWidth = len(count)
+		for _, count := range result.numbers {
+			width := len(strconv.Itoa(count))
+			if colWidth < width {
+				colWidth = width
 			}
-			path := result[len(result)-1]
 			if wideStdin &&
-				(path == "-" || path == "") &&
+				(result.path == "-" || result.path == "") &&
 				colWidth < 7 {
 				colWidth = 7
 			}
 		}
 	}
 
-	colFmt := fmt.Sprintf("%%%ds", colWidth)
+	colFmt := fmt.Sprintf("%%%dd", colWidth)
 	for _, result := range results {
 		var row []string
-		for _, count := range result[:len(result)-1] {
+		for _, count := range result.numbers {
 			row = append(row, fmt.Sprintf(colFmt, count))
 		}
-		if path := result[len(result)-1]; path != "" {
-			row = append(row, path)
+		if result.path != "" {
+			row = append(row, result.path)
 		}
 		fmt.Fprintln(wc.output, strings.Join(row, " "))
+	}
+}
+
+func (lineCount) update(count *int, line string) {
+	if strings.HasSuffix(line, "\n") {
+		*count++
+	}
+}
+
+func (lineCount) aggregate(agg *int, count int) {
+	*agg += count
+}
+
+var wordRe = regexp.MustCompile(`\pL+`)
+
+func (wordCount) update(count *int, line string) {
+	*count += len(wordRe.FindAllString(line, -1))
+}
+
+func (wordCount) aggregate(agg *int, count int) {
+	*agg += count
+}
+
+func (charCount) update(count *int, line string) {
+	*count += utf8.RuneCountInString(line)
+}
+
+func (charCount) aggregate(agg *int, count int) {
+	*agg += count
+}
+
+func (byteCount) update(count *int, line string) {
+	*count += len(line)
+}
+
+func (byteCount) aggregate(agg *int, count int) {
+	*agg += count
+}
+
+func (ws widthStat) update(width *int, line string) {
+	line = strings.TrimRight(line, "\n")
+	runeCount := utf8.RuneCountInString(line)
+	ws.aggregate(width, runeCount)
+}
+
+func (widthStat) aggregate(agg *int, width int) {
+	if *agg < width {
+		*agg = width
 	}
 }
