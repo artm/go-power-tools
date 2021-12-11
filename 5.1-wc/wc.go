@@ -55,7 +55,7 @@ func WithArgs(args []string) option {
 		}
 		wc.paths = fset.Args()
 		if len(wc.paths) == 0 {
-			wc.paths = []string{"-"}
+			wc.paths = []string{""}
 		}
 		return nil
 	}
@@ -79,7 +79,7 @@ func (wc *Wc) Count() error {
 	for _, path := range wc.paths {
 		var f io.ReadCloser
 		var err error
-		if path == "-" {
+		if path == "-" || path == "" {
 			var ok bool
 			f, ok = wc.input.(io.ReadCloser)
 			if !ok {
@@ -153,7 +153,7 @@ func (wc *Wc) countIn(reader io.Reader, path string) error {
 		tokens = append(tokens, strconv.Itoa(count))
 	} else {
 		countFmt := "%2d"
-		if path == "-" {
+		if path == "-" || path == "" {
 			countFmt = "%7d"
 		}
 		order := []struct {
@@ -172,7 +172,7 @@ func (wc *Wc) countIn(reader io.Reader, path string) error {
 			}
 		}
 	}
-	if path != "-" {
+	if path != "" {
 		tokens = append(tokens, path)
 	}
 	fmt.Fprintf(wc.output, "%s\n", strings.Join(tokens, " "))
