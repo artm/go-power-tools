@@ -31,6 +31,15 @@ type resultRow struct {
 	path    string
 }
 
+func Count() error {
+	wc, err := NewWc(WithArgs(os.Args[1:]))
+	if err != nil {
+		return err
+	}
+	err = wc.Count()
+	return err
+}
+
 func NewWc(options ...option) (*Wc, error) {
 	wc := &Wc{
 		output:    os.Stdout,
@@ -78,16 +87,16 @@ func WithArgs(args []string) option {
 	}
 }
 
-func WithOutput(output io.Writer) option {
+func WithInput(input io.Reader) option {
 	return func(wc *Wc) error {
-		wc.output = output
+		wc.input = input
 		return nil
 	}
 }
 
-func WithInput(input io.Reader) option {
+func WithOutput(output io.Writer) option {
 	return func(wc *Wc) error {
-		wc.input = input
+		wc.output = output
 		return nil
 	}
 }
@@ -128,18 +137,6 @@ func (wc *Wc) inputCloser() io.ReadCloser {
 		file = io.NopCloser(wc.input)
 	}
 	return file
-}
-
-func Count() error {
-	wc, err := NewWc(WithArgs(os.Args[1:]))
-	if err != nil {
-		return err
-	}
-	err = wc.Count()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (wc *Wc) countIn(reader io.Reader) ([]int, error) {

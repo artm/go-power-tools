@@ -1,7 +1,13 @@
 package main
 
-import "wc"
+import (
+	"fmt"
+	"os"
+	"wc"
+)
 
 func main() {
-	wc.Count()
+	if err := wc.Count(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 }
