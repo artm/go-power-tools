@@ -18,10 +18,11 @@ type stat interface {
 }
 
 type Wc struct {
-	output io.Writer
-	input  io.Reader
-	stats  []stat
-	paths  []string
+	output    io.Writer
+	input     io.Reader
+	stats     []stat
+	paths     []string
+	printPath bool
 }
 
 type option func(*Wc) error
@@ -39,7 +40,8 @@ type resultRow struct {
 
 func NewWc(options ...option) (*Wc, error) {
 	wc := &Wc{
-		output: os.Stdout,
+		output:    os.Stdout,
+		printPath: false,
 	}
 	for _, option := range options {
 		if err := option(wc); err != nil {
@@ -52,38 +54,33 @@ func NewWc(options ...option) (*Wc, error) {
 func WithArgs(args []string) option {
 	return func(wc *Wc) error {
 		fset := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-		lines := fset.Bool("l", false, "print the newline counts")
-		words := fset.Bool("w", false, "print the word counts")
-		chars := fset.Bool("m", false, "print the character counts")
-		bytes := fset.Bool("c", false, "print the byte counts")
-		width := fset.Bool("L", false, "print the maximum display width")
+		statsOrder := []struct {
+			enabled *bool
+			stat    stat
+		}{
+			{fset.Bool("l", false, "print the newline counts"), lineCount{}},
+			{fset.Bool("w", false, "print the word counts"), wordCount{}},
+			{fset.Bool("m", false, "print the character counts"), charCount{}},
+			{fset.Bool("c", false, "print the byte counts"), byteCount{}},
+			{fset.Bool("L", false, "print the maximum display width"), widthStat{}},
+		}
 		err := fset.Parse(args)
 		if err != nil {
 			return err
 		}
-		if !(*bytes || *chars || *lines || *width || *words) {
-			*lines = true
-			*words = true
-			*bytes = true
+		for _, rec := range statsOrder {
+			if *rec.enabled {
+				wc.stats = append(wc.stats, rec.stat)
+			}
 		}
-		if *lines {
-			wc.stats = append(wc.stats, lineCount{})
-		}
-		if *words {
-			wc.stats = append(wc.stats, wordCount{})
-		}
-		if *chars {
-			wc.stats = append(wc.stats, charCount{})
-		}
-		if *bytes {
-			wc.stats = append(wc.stats, byteCount{})
-		}
-		if *width {
-			wc.stats = append(wc.stats, widthStat{})
+		if len(wc.stats) == 0 {
+			wc.stats = []stat{lineCount{}, wordCount{}, byteCount{}}
 		}
 		wc.paths = fset.Args()
 		if len(wc.paths) == 0 {
-			wc.paths = []string{""}
+			wc.paths = []string{"-"}
+		} else {
+			wc.printPath = true
 		}
 		return nil
 	}
@@ -108,7 +105,7 @@ func (wc *Wc) Count() error {
 	for _, path := range wc.paths {
 		var f io.ReadCloser
 		var err error
-		if path == "-" || path == "" {
+		if path == "-" {
 			var ok bool
 			f, ok = wc.input.(io.ReadCloser)
 			if !ok {
@@ -195,7 +192,7 @@ func (wc *Wc) Print(results []resultRow) {
 				colWidth = width
 			}
 			if wideStdin &&
-				(result.path == "-" || result.path == "") &&
+				(result.path == "-") &&
 				colWidth < 7 {
 				colWidth = 7
 			}
@@ -208,7 +205,7 @@ func (wc *Wc) Print(results []resultRow) {
 		for _, count := range result.numbers {
 			row = append(row, fmt.Sprintf(colFmt, count))
 		}
-		if result.path != "" {
+		if wc.printPath {
 			row = append(row, result.path)
 		}
 		fmt.Fprintln(wc.output, strings.Join(row, " "))
