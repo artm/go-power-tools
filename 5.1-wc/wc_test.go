@@ -87,13 +87,19 @@ func TestWc(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Errorf(
-				"wc %s -want +got:\n%s",
-				testCase.args, diff,
-			)
+		if got != want {
+			t.Errorf(textDiff(testCase.args, want, got))
 		}
 	}
+}
+
+func textDiff(title, want, got string) string {
+	wants := strings.Split(strings.TrimRight(want, "\n"), "\n")
+	gots := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	return fmt.Sprintf(
+		"%s (-want +got):\n%s",
+		title, cmp.Diff(wants, gots),
+	)
 }
 
 func runWc(t *testing.T, input string, args ...string) string {

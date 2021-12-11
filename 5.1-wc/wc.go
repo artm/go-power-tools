@@ -48,7 +48,7 @@ func WithArgs(args []string) option {
 		wc.lines = *lines
 		wc.width = *width
 		wc.words = *words
-		if wc.flagCount() == 0 {
+		if !(*bytes || *chars || *lines || *width || *words) {
 			wc.lines = true
 			wc.words = true
 			wc.bytes = true
@@ -76,6 +76,7 @@ func WithInput(input io.Reader) option {
 }
 
 func (wc *Wc) Count() error {
+	results := make([][]string, 0)
 	for _, path := range wc.paths {
 		var f io.ReadCloser
 		var err error
@@ -91,11 +92,15 @@ func (wc *Wc) Count() error {
 				return err
 			}
 		}
-		err = wc.countIn(f, path)
+		result, err := wc.countIn(f)
 		if err != nil {
 			return err
 		}
+		result = append(result, path)
+		results = append(results, result)
 	}
+	results = wc.CalcTotals(results)
+	wc.Print(results)
 	return nil
 }
 
@@ -111,7 +116,7 @@ func Count() error {
 	return nil
 }
 
-func (wc *Wc) countIn(reader io.Reader, path string) error {
+func (wc *Wc) countIn(reader io.Reader) ([]string, error) {
 	var lines, bytes, chars, width, words int
 	streader := bufio.NewReader(reader)
 	for {
@@ -132,66 +137,74 @@ func (wc *Wc) countIn(reader io.Reader, path string) error {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	tokens := []string{}
-	if wc.flagCount() == 1 {
-		var count int
-		switch {
-		case wc.bytes:
-			count = bytes
-		case wc.chars:
-			count = chars
-		case wc.lines:
-			count = lines
-		case wc.width:
-			count = width
-		case wc.words:
-			count = words
+	results := make([]string, 0)
+	order := []struct {
+		on    bool
+		count int
+	}{
+		{on: wc.lines, count: lines},
+		{on: wc.words, count: words},
+		{on: wc.chars, count: chars},
+		{on: wc.bytes, count: bytes},
+		{on: wc.width, count: width},
+	}
+	for _, rec := range order {
+		if rec.on {
+			results = append(results, strconv.Itoa(rec.count))
 		}
-		tokens = append(tokens, strconv.Itoa(count))
-	} else {
-		countFmt := "%2d"
-		if path == "-" || path == "" {
-			countFmt = "%7d"
+	}
+	return results, nil
+}
+
+func (wc *Wc) CalcTotals(results [][]string) [][]string {
+	if len(results) < 2 {
+		return results
+	}
+	colNum := len(results[0])
+	totals := make([]int, colNum-1)
+	for _, result := range results {
+		for i, count := range result[:colNum-1] {
+			iCount, _ := strconv.Atoi(count)
+			totals[i] += iCount
 		}
-		order := []struct {
-			on    bool
-			count int
-		}{
-			{on: wc.lines, count: lines},
-			{on: wc.words, count: words},
-			{on: wc.chars, count: chars},
-			{on: wc.bytes, count: bytes},
-			{on: wc.width, count: width},
-		}
-		for _, rec := range order {
-			if rec.on {
-				tokens = append(tokens, fmt.Sprintf(countFmt, rec.count))
+	}
+	sTotals := make([]string, colNum)
+	for i, v := range totals {
+		sTotals[i] = strconv.Itoa(v)
+	}
+	sTotals[colNum-1] = "total"
+	results = append(results, sTotals)
+	return results
+}
+
+func (wc *Wc) Print(results [][]string) {
+	colWidth := 1
+	for _, result := range results {
+		for _, count := range result[:len(result)-1] {
+			if colWidth < len(count) {
+				colWidth = len(count)
+			}
+			path := result[len(result)-1]
+			if len(result) > 2 &&
+				(path == "-" || path == "") &&
+				colWidth < 7 {
+				colWidth = 7
 			}
 		}
 	}
-	if path != "" {
-		tokens = append(tokens, path)
-	}
-	fmt.Fprintf(wc.output, "%s\n", strings.Join(tokens, " "))
-	return nil
-}
 
-func (wc *Wc) flagCount() int {
-	flags := []bool{
-		wc.bytes,
-		wc.chars,
-		wc.lines,
-		wc.width,
-		wc.words,
-	}
-	var count int
-	for _, flag := range flags {
-		if flag {
-			count++
+	colFmt := fmt.Sprintf("%%%ds", colWidth)
+	for _, result := range results {
+		var row []string
+		for _, count := range result[:len(result)-1] {
+			row = append(row, fmt.Sprintf(colFmt, count))
 		}
+		if path := result[len(result)-1]; path != "" {
+			row = append(row, path)
+		}
+		fmt.Fprintln(wc.output, strings.Join(row, " "))
 	}
-	return count
 }
