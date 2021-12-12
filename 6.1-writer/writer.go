@@ -9,3 +9,8 @@ func WriteToFile(path string, data []byte) error {
 	}
 	return os.Chmod(path, 0600)
 }
+
+func WriteZeros(path string, count int) error {
+	data := make([]byte, count)
+	return WriteToFile(path, data)
+}
