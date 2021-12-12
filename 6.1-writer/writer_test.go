@@ -114,6 +114,30 @@ func TestWriteZerosClobbers(t *testing.T) {
 	}
 }
 
+func TestZeroerWrites(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/zeroer_writes_test.dat"
+	args := []string{"-size", "3", path}
+	cli, err := writer.NewCLI(
+		writer.FromArgs(args),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cli.Write()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := make([]byte, 3)
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
 func benchmarkWriteZeros(count int, b *testing.B) {
 	path := b.TempDir() + "/write_zeros_test.dat"
 	for i := 0; i < b.N; i++ {
