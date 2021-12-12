@@ -113,3 +113,22 @@ func TestWriteZerosClobbers(t *testing.T) {
 		t.Fatal(cmp.Diff(want, got))
 	}
 }
+
+func benchmarkWriteZeros(count int, b *testing.B) {
+	path := b.TempDir() + "/write_zeros_test.dat"
+	for i := 0; i < b.N; i++ {
+		writer.WriteZeros(path, count)
+	}
+}
+
+func BenchmarkWriteZeros5(b *testing.B) {
+	benchmarkWriteZeros(5, b)
+}
+
+func BenchmarkWriteZeros5k(b *testing.B) {
+	benchmarkWriteZeros(5000, b)
+}
+
+func BenchmarkWriteZeros5M(b *testing.B) {
+	benchmarkWriteZeros(5000000, b)
+}
