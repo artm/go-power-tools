@@ -118,7 +118,31 @@ func TestZeroerWrites(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/zeroer_writes_test.dat"
 	args := []string{"-size", "3", path}
-	cli, err := writer.NewCLI(
+	cli, err := writer.NewZeroer(
+		writer.FromArgs(args),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cli.Write()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := make([]byte, 3)
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestZeroerRetries(t *testing.T) {
+	t.Parallel()
+	path := t.TempDir() + "/zeroer_retries_test.dat"
+	args := []string{"-size", "3", "-retries", "3", path}
+	cli, err := writer.NewZeroer(
 		writer.FromArgs(args),
 	)
 	if err != nil {
