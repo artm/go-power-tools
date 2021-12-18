@@ -1,11 +1,14 @@
 package writer_test
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"testing"
 	"writer"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/vulpine-io/io-test/v1/pkg/iotest"
 )
 
 func TestWriteToFile(t *testing.T) {
@@ -138,11 +141,33 @@ func TestZeroerWrites(t *testing.T) {
 	}
 }
 
+type faultyOutput struct {
+	writer                    io.WriteCloser
+	succeedEvery, writesCount int
+}
+
+func (fo *faultyOutput) Write(data []byte) (int, error) {
+	fo.writesCount++
+	if fo.writesCount%fo.succeedEvery == 0 {
+		return fo.writer.Write(data)
+	}
+	return 0, fmt.Errorf("writer error was simulated")
+}
+
+func (fo *faultyOutput) Close() error {
+	return fo.writer.Close()
+}
+
 func TestZeroerRetries(t *testing.T) {
 	t.Parallel()
-	path := t.TempDir() + "/zeroer_retries_test.dat"
-	args := []string{"-size", "3", "-retries", "3", path}
+	mockWriter := &iotest.WriteCloser{}
+	mockOutput := &faultyOutput{
+		writer:       io.WriteCloser(mockWriter),
+		succeedEvery: 3,
+	}
+	args := []string{"-size", "3", "-retries", "3"}
 	cli, err := writer.NewZeroer(
+		writer.WithOutput(mockOutput),
 		writer.FromArgs(args),
 	)
 	if err != nil {
@@ -153,10 +178,7 @@ func TestZeroerRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := make([]byte, 3)
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := mockWriter.WrittenBytes
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
 	}
