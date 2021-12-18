@@ -37,6 +37,13 @@ func NewZeroer(options ...option) (*zeroer, error) {
 	return z, nil
 }
 
+func WithOutput(output io.WriteCloser) option {
+	return func(z *zeroer) error {
+		z.output = output
+		return nil
+	}
+}
+
 func WithPath(path string) option {
 	return func(z *zeroer) error {
 		f, err := os.Create(path)
@@ -70,10 +77,17 @@ func FromArgs(args []string) option {
 		err := fset.Parse(args)
 		checkErr(err)
 		rest := fset.Args()
-		if len(rest) != 1 {
-			checkErr(fmt.Errorf("single filename argument is required"))
+		switch len(rest) {
+		case 1:
+			return WithPath(rest[0])(z)
+		case 0:
+			if z.output == nil {
+				checkErr(fmt.Errorf("a filename argument is required"))
+			}
+		default:
+			checkErr(fmt.Errorf("a single filename argument is expected"))
 		}
-		return WithPath(rest[0])(z)
+		return nil
 	}
 }
 
