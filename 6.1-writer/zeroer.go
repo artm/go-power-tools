@@ -95,17 +95,23 @@ func (z *zeroer) Write() error {
 	defer z.output.Close()
 
 	buffer := make([]byte, bufferSize)
-	size := z.size
-	for size > 0 {
+	remaining := z.size
+	retries := z.retries
+	for remaining > 0 {
 		chunkSize := bufferSize
-		if size < bufferSize {
-			chunkSize = size
+		offset := 0
+		if remaining < bufferSize {
+			chunkSize = remaining
 		}
-		_, err := z.output.Write(buffer[:chunkSize])
+		written, err := z.output.Write(buffer[offset:chunkSize])
 		if err != nil {
-			return err
+			retries--
+			if retries < 1 {
+				return err
+			}
 		}
-		size -= chunkSize
+		offset += written
+		remaining -= written
 	}
 	return nil
 }
