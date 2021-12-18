@@ -3,11 +3,12 @@ package writer
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 )
 
 type zeroer struct {
-	path    string
+	output  io.WriteCloser
 	size    int
 	retries int
 }
@@ -38,7 +39,11 @@ func NewZeroer(options ...option) (*zeroer, error) {
 
 func WithPath(path string) option {
 	return func(z *zeroer) error {
-		z.path = path
+		f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		z.output = io.WriteCloser(f)
 		return nil
 	}
 }
@@ -68,17 +73,12 @@ func FromArgs(args []string) option {
 		if len(rest) != 1 {
 			checkErr(fmt.Errorf("single filename argument is required"))
 		}
-		z.path = rest[0]
-		return nil
+		return WithPath(rest[0])(z)
 	}
 }
 
 func (z *zeroer) Write() error {
-	f, err := os.Create(z.path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+	defer z.output.Close()
 
 	buffer := make([]byte, bufferSize)
 	size := z.size
@@ -87,7 +87,7 @@ func (z *zeroer) Write() error {
 		if size < bufferSize {
 			chunkSize = size
 		}
-		_, err = f.Write(buffer[:chunkSize])
+		_, err := z.output.Write(buffer[:chunkSize])
 		if err != nil {
 			return err
 		}
